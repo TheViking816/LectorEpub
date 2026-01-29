@@ -33,6 +33,7 @@ function App() {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
+    const [showFullscreenControls, setShowFullscreenControls] = useState(false)
     const [settings, setSettings] = useState<ReaderSettings>(() => {
         const saved = localStorage.getItem('epub-settings')
         return saved ? JSON.parse(saved) : DEFAULT_SETTINGS
@@ -44,6 +45,41 @@ function App() {
     useEffect(() => {
         localStorage.setItem('epub-settings', JSON.stringify(settings))
     }, [settings])
+
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            setIsFullscreen(Boolean(document.fullscreenElement))
+        }
+
+        document.addEventListener('fullscreenchange', handleFullscreenChange)
+        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }, [])
+
+    useEffect(() => {
+        if (!isFullscreen) {
+            setShowFullscreenControls(false)
+            if (fullscreenControlsTimeoutRef.current) {
+                clearTimeout(fullscreenControlsTimeoutRef.current)
+                fullscreenControlsTimeoutRef.current = null
+            }
+            return
+        }
+
+        setShowFullscreenControls(true)
+        if (fullscreenControlsTimeoutRef.current) {
+            clearTimeout(fullscreenControlsTimeoutRef.current)
+        }
+        fullscreenControlsTimeoutRef.current = setTimeout(() => {
+            setShowFullscreenControls(false)
+        }, 2000)
+
+        return () => {
+            if (fullscreenControlsTimeoutRef.current) {
+                clearTimeout(fullscreenControlsTimeoutRef.current)
+                fullscreenControlsTimeoutRef.current = null
+            }
+        }
+    }, [isFullscreen])
 
     const getBookSyncId = (book: LocalBook) => {
         // Use the book's unique ID for sync - much more reliable than title/author
@@ -84,6 +120,7 @@ function App() {
     }
 
     const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const fullscreenControlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
     const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!currentBook || !(window as any).epubRendition) return;
@@ -142,13 +179,34 @@ function App() {
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
             document.documentElement.requestFullscreen()
-            setIsFullscreen(true)
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen()
-                setIsFullscreen(false)
             }
         }
+    }
+
+    const handleFullscreenMouseMove = () => {
+        if (!isFullscreen) return
+        setShowFullscreenControls(true)
+        if (fullscreenControlsTimeoutRef.current) {
+            clearTimeout(fullscreenControlsTimeoutRef.current)
+        }
+        fullscreenControlsTimeoutRef.current = setTimeout(() => {
+            setShowFullscreenControls(false)
+        }, 2000)
+    }
+
+    const exitFullscreen = async () => {
+        if (document.fullscreenElement && document.exitFullscreen) {
+            await document.exitFullscreen()
+        }
+    }
+
+    const handleBackToLibrary = async () => {
+        await exitFullscreen()
+        setView('library')
+        setFileData(null)
     }
 
     const themeColors = {
@@ -174,7 +232,10 @@ function App() {
     }
 
     return (
-        <div className={`fixed inset-0 flex flex-col transition-colors duration-500 ${themeColors[settings.theme]} ${settings.theme === 'dark' ? 'dark' : ''} reader-container`}>
+        <div
+            className={`fixed inset-0 flex flex-col transition-colors duration-500 ${themeColors[settings.theme]} ${settings.theme === 'dark' ? 'dark' : ''} reader-container`}
+            onMouseMove={isFullscreen ? handleFullscreenMouseMove : undefined}
+        >
             {/* Header - Hidden in fullscreen */}
             {!isFullscreen && (
                 <header className={`h-16 flex items-center justify-between px-4 sm:px-6 border-b z-30 ${headerFooterClasses}`}>
@@ -218,6 +279,26 @@ function App() {
                         </button>
                     </div>
                 </header>
+            )}
+
+            {isFullscreen && showFullscreenControls && (
+                <div className="absolute top-3 left-3 z-40 flex items-center gap-2">
+                    <button
+                        onClick={handleBackToLibrary}
+                        className="px-3 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase border-2 bg-white/80 border-slate-200 backdrop-blur-md hover:bg-white"
+                        title="Volver a la biblioteca"
+                    >
+                        <ChevronLeft className="w-4 h-4 inline-block -mt-0.5" />
+                        Biblioteca
+                    </button>
+                    <button
+                        onClick={exitFullscreen}
+                        className="p-2 rounded-full bg-white/80 border border-slate-200 backdrop-blur-md hover:bg-white"
+                        title="Salir de pantalla completa"
+                    >
+                        <Minimize className="w-5 h-5" />
+                    </button>
+                </div>
             )}
 
             {/* Main Content */}

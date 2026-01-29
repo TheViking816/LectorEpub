@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './index.css'
+import { registerSW } from 'virtual:pwa-register'
 
 // Clear old database versions on startup
 const clearOldDatabases = async () => {
@@ -23,4 +24,8 @@ clearOldDatabases().then(() => {
             <App />
         </React.StrictMode>,
     );
+});
+
+registerSW({
+  immediate: true
 });

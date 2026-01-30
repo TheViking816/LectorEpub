@@ -25,7 +25,6 @@ body {
 
 /* Fullscreen reading mode - no interruptions */
 body:fullscreen {
-  background: #ffffff !important;
   overflow: hidden !important;
   /* Reader handles its own overflow */
 }

@@ -285,7 +285,12 @@ function App() {
                 <div className="absolute top-3 left-3 z-40 flex items-center gap-2">
                     <button
                         onClick={handleBackToLibrary}
-                        className="px-3 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase border-2 bg-white/80 border-slate-200 backdrop-blur-md hover:bg-white"
+                        className={`px-3 py-2 rounded-xl text-[10px] font-black tracking-widest uppercase border-2 backdrop-blur-md transition-all ${settings.theme === 'dark'
+                            ? 'bg-slate-900/80 border-slate-700 text-gray-200 hover:bg-slate-800'
+                            : settings.theme === 'sepia'
+                                ? 'bg-[#fbf0d9]/80 border-[#e8dcc4] text-[#5b4636] hover:bg-[#fbf0d9]'
+                                : 'bg-white/80 border-slate-200 text-gray-900 hover:bg-white'
+                            }`}
                         title="Volver a la biblioteca"
                     >
                         <ChevronLeft className="w-4 h-4 inline-block -mt-0.5" />
@@ -293,7 +298,12 @@ function App() {
                     </button>
                     <button
                         onClick={exitFullscreen}
-                        className="p-2 rounded-full bg-white/80 border border-slate-200 backdrop-blur-md hover:bg-white"
+                        className={`p-2 rounded-full border backdrop-blur-md transition-all ${settings.theme === 'dark'
+                            ? 'bg-slate-900/80 border-slate-700 text-gray-200 hover:bg-slate-800'
+                            : settings.theme === 'sepia'
+                                ? 'bg-[#fbf0d9]/80 border-[#e8dcc4] text-[#5b4636] hover:bg-[#fbf0d9]'
+                                : 'bg-white/80 border-slate-200 text-gray-900 hover:bg-white'
+                            }`}
                         title="Salir de pantalla completa"
                     >
                         <Minimize className="w-5 h-5" />

@@ -461,7 +461,7 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
     }
 
     return (
-        <div className={`min-h-screen p-4 sm:p-12 transition-colors duration-500 overflow-x-hidden ${themeClasses[theme]}`}>
+        <div className={`min-h-screen p-4 sm:p-12 transition-colors duration-500 overflow-x-hidden ${themeClasses[theme]} ${theme === 'dark' ? 'dark' : ''}`}>
             <div className="max-w-7xl mx-auto">
                 {/* Header Section */}
                 <div className="flex items-center justify-between mb-8 sm:mb-12 gap-2">

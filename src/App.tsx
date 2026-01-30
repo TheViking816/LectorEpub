@@ -234,7 +234,6 @@ function App() {
     return (
         <div
             className={`fixed inset-0 flex flex-col transition-colors duration-500 ${themeColors[settings.theme]} ${settings.theme === 'dark' ? 'dark' : ''} reader-container`}
-            onMouseMove={isFullscreen ? handleShowControls : undefined}
         >
             {/* Header - Hidden in fullscreen */}
             {!isFullscreen && (

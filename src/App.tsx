@@ -186,7 +186,7 @@ function App() {
         }
     }
 
-    const handleFullscreenMouseMove = () => {
+    const handleShowControls = () => {
         if (!isFullscreen) return
         setShowFullscreenControls(true)
         if (fullscreenControlsTimeoutRef.current) {
@@ -194,7 +194,7 @@ function App() {
         }
         fullscreenControlsTimeoutRef.current = setTimeout(() => {
             setShowFullscreenControls(false)
-        }, 2000)
+        }, 3000)
     }
 
     const exitFullscreen = async () => {
@@ -234,7 +234,7 @@ function App() {
     return (
         <div
             className={`fixed inset-0 flex flex-col transition-colors duration-500 ${themeColors[settings.theme]} ${settings.theme === 'dark' ? 'dark' : ''} reader-container`}
-            onMouseMove={isFullscreen ? handleFullscreenMouseMove : undefined}
+            onMouseMove={isFullscreen ? handleShowControls : undefined}
         >
             {/* Header - Hidden in fullscreen */}
             {!isFullscreen && (
@@ -323,7 +323,10 @@ function App() {
                             <ChevronLeft className="w-8 h-8" />
                         </div>
                     </div>
-                    <div className="flex-1 h-full" />
+                    <div
+                        className="flex-1 h-full cursor-pointer"
+                        onClick={handleShowControls}
+                    />
                     <div
                         className="w-16 sm:w-24 h-full flex items-center justify-center cursor-pointer group z-20"
                         onClick={() => (window as any).epubRendition?.next()}

@@ -12,8 +12,8 @@ export default defineConfig({
         name: 'Lector EPUB',
         short_name: 'Lector EPUB',
         description: 'Lector EPUB',
-        start_url: '/LectorEpub/',
-        scope: '/LectorEpub/',
+        start_url: './',
+        scope: './',
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#3b82f6',
@@ -32,7 +32,7 @@ export default defineConfig({
       }
     })
   ],
-  base: '/LectorEpub/',
+  base: './',
   server: {
     host: true,
     strictPort: true,

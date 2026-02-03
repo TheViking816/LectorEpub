@@ -164,13 +164,6 @@ const SortableBookCard = ({
     )
 }
 
-interface LibraryProps {
-    onSelectBook: (book: LocalBook) => void
-    theme: 'white' | 'sepia' | 'dark'
-    onOpenSettings: () => void
-    onUpdateTheme: (theme: 'white' | 'sepia' | 'dark') => void
-}
-
 const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, onUpdateTheme }) => {
     const [books, setBooks] = useState<DisplayBook[]>([])
     const [loading, setLoading] = useState(true)
@@ -210,114 +203,100 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
         })
     )
 
-    // 1. Load Local Data Immediately (with ultra-safe fallback)
+    // 1. Initial Load (Fast, robust, with safety timeout)
     useEffect(() => {
         let isMounted = true;
 
-        // Force-hide loader after 3 seconds no matter what
-        const finalSafetyTimer = setTimeout(() => {
-            if (isMounted && loading) {
-                console.warn("Library: Hard timeout reached, forcing loader hide");
+        // ULTIMATE SAFETY: Hide loader after 2s no matter what
+        const emergencyTimer = setTimeout(() => {
+            if (isMounted) {
+                console.log("Library: Emergency loader hide triggered");
                 setLoading(false);
             }
-        }, 3000);
+        }, 2000);
 
         const loadInitialData = async () => {
-            console.log("Library: Starting initial local load...")
             try {
-                // Wrap DB calls in timeouts to prevent hanging
-                const withTimeout = (promise: Promise<any>, timeoutMs: number) =>
-                    Promise.race([
-                        promise,
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
-                    ]);
+                // Fetch local data
+                const [localBooks, states] = await Promise.all([
+                    getAllLocalBooks().catch(() => []),
+                    getAllReadingStates().catch(() => [])
+                ]);
 
-                // Load local books
-                const localBooks = await withTimeout(getAllLocalBooks(), 2000).catch(() => []);
-                console.log(`Library: Found ${localBooks?.length || 0} local books`)
+                if (!isMounted) return;
 
-                // Load reading states
-                const states = await withTimeout(getAllReadingStates(), 2000).catch(() => []);
-                if (isMounted) setReadingStates(states);
+                setReadingStates(states);
 
-                const displayBooks: DisplayBook[] = (localBooks || []).map((lb: LocalBook) => ({
+                const displayBooks: DisplayBook[] = (localBooks || []).map((lb: any) => ({
                     ...lb,
                     isDownloaded: true,
                     isDownloading: false,
                     isFinished: states.find((rs: any) => rs.bookId === lb.id)?.isFinished || false
-                }))
+                }));
 
-                if (isMounted) {
-                    setBooks(displayBooks)
-                    setLoading(false)
-                }
+                setBooks(displayBooks);
+                setLoading(false);
             } catch (err) {
-                console.error("Library: Error loading local data:", err)
-                if (isMounted) setLoading(false)
+                console.error("Library: Initial load error:", err);
+                if (isMounted) setLoading(false);
             } finally {
-                clearTimeout(finalSafetyTimer);
+                clearTimeout(emergencyTimer);
             }
-        }
+        };
 
-        loadInitialData()
-        return () => { isMounted = false; clearTimeout(finalSafetyTimer); };
-    }, [])
+        loadInitialData();
+        return () => {
+            isMounted = false;
+            clearTimeout(emergencyTimer);
+        };
+    }, []);
 
-    // 2. Background Cloud Sync
+    // 2. Background Cloud Sync (Runs after mount)
     useEffect(() => {
-        if (loading) return // Wait for initial local load
+        if (loading) return;
 
-        console.log("Library: Starting background cloud sync...")
-        setIsSyncing(true)
+        console.log("Library: Starting cloud sync...");
+        setIsSyncing(true);
 
-        const q = query(collection(db, 'books'))
+        const q = query(collection(db, 'books'));
         const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, async (snapshot) => {
             try {
-                const isFromCache = snapshot.metadata.fromCache
-                console.log(`Library: Cloud Sync update received. Docs: ${snapshot.docs.length} (Cache: ${isFromCache})`)
-
                 const cloudBooks = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
-                })) as DisplayBook[]
+                })) as DisplayBook[];
 
-                // Re-fetch local data to merge correctly
-                const localBooks = await getAllLocalBooks()
-                const states = await getAllReadingStates()
+                const [localBooks, states] = await Promise.all([
+                    getAllLocalBooks().catch(() => []),
+                    getAllReadingStates().catch(() => [])
+                ]);
 
                 const mergedBooks = cloudBooks.map(cb => {
-                    const local = localBooks.find(lb => lb.id === cb.id)
-                    const readingState = states.find(rs => rs.bookId === cb.id)
+                    const local = localBooks.find((lb: any) => lb.id === cb.id);
+                    const readingState = states.find((rs: any) => rs.bookId === cb.id);
                     return {
                         ...cb,
                         isDownloaded: !!local,
                         data: local?.data,
                         isFinished: readingState?.isFinished || false
-                    }
-                })
+                    };
+                });
 
-                setBooks(mergedBooks.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || (b.createdAt ?? 0) - (a.createdAt ?? 0)))
-                setError(null)
-            } catch (e: any) {
-                console.error("Library: Cloud Sync processing error:", e)
+                setBooks(mergedBooks.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || (b.createdAt ?? 0) - (a.createdAt ?? 0)));
+                setError(snapshot.metadata.fromCache ? null : null); // Reset error on update
+            } catch (err) {
+                console.error("Library: Sync processing error:", err);
             } finally {
-                setIsSyncing(false)
+                setIsSyncing(false);
             }
         }, (err) => {
-            console.error("Library: Cloud Sync connection error:", err)
-            // We don't block the UI for sync errors
-            setIsSyncing(false)
-            // Only show error if we have no books at all (maybe completely offline/no cache)
-            if (books.length === 0) {
-                setError("No se pudo conectar con la nube.")
-            }
-        })
+            console.error("Library: Firestore sync aborted:", err);
+            setIsSyncing(false);
+            if (books.length === 0) setError("Modo offline o sin conexión.");
+        });
 
-        return () => {
-            console.log("Library: Stopping cloud sync listener")
-            unsubscribe()
-        }
-    }, [loading]) // Start sync after local load is done
+        return () => unsubscribe();
+    }, [loading]);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -350,19 +329,13 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                 order: books.length
             }
 
-            // 1. Save locally
             await saveBookLocally({ ...bookMetadata, data: arrayBuffer })
-            console.log("Book saved locally:", bookMetadata.title)
-
-            // 2. Save to Firestore Cloud
             await setDoc(doc(db, 'books', bookId), bookMetadata)
             await uploadBookToFirestore(bookId, arrayBuffer)
-
-            alert("¡Libro subido con éxito a la nube!")
-
+            alert("¡Libro subido con éxito!")
         } catch (error) {
             console.error("Upload error:", error)
-            alert("Error al subir el libro a la nube.")
+            alert("Error al subir el libro.")
         } finally {
             setUploading(false)
             e.target.value = ''
@@ -371,7 +344,7 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
 
     const handleDelete = async (e: React.MouseEvent, id: string) => {
         e.stopPropagation()
-        if (confirm("¿Eliminar este libro de la nube y de todos tus dispositivos?")) {
+        if (confirm("¿Eliminar este libro de todos tus dispositivos?")) {
             await deleteLocalBook(id)
             await deleteBookFromFirestore(id)
         }
@@ -381,20 +354,14 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
         e.stopPropagation()
         setBooks(prev => prev.map(b => b.id === book.id ? { ...b, isDownloading: true } : b))
         try {
-            console.log("Starting download for book:", book.id, book.title)
             const data = await downloadBookFromFirestore(book.id)
             await saveBookLocally({ ...book, data })
-            console.log("Download completed successfully for:", book.title)
-
-            // Force UI update
             setBooks(prev => prev.map(b =>
-                b.id === book.id
-                    ? { ...b, isDownloaded: true, isDownloading: false, data }
-                    : b
+                b.id === book.id ? { ...b, isDownloaded: true, isDownloading: false, data } : b
             ))
         } catch (error) {
             console.error("Download error:", error)
-            alert("Error al descargar el libro de la nube: " + error)
+            alert("Error al descargar.")
             setBooks(prev => prev.map(b => b.id === book.id ? { ...b, isDownloading: false } : b))
         }
     }
@@ -425,19 +392,13 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
             } else {
                 await markBookAsFinished(bookId)
             }
-
-            // Refresh reading states
             const states = await getAllReadingStates()
             setReadingStates(states)
-
-            // Update books list
             setBooks(prev => prev.map(book =>
-                book.id === bookId
-                    ? { ...book, isFinished: !currentlyFinished }
-                    : book
+                book.id === bookId ? { ...book, isFinished: !currentlyFinished } : book
             ))
         } catch (e) {
-            console.error('Error toggling finished status:', e)
+            console.error('Error toggling finished:', e)
         }
     }
 
@@ -461,7 +422,6 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
     return (
         <div className={`min-h-screen p-4 sm:p-12 transition-colors duration-500 overflow-x-hidden ${themeClasses[theme]} ${theme === 'dark' ? 'dark' : ''}`}>
             <div className="max-w-7xl mx-auto">
-                {/* Header Section */}
                 <div className="flex items-center justify-between mb-8 sm:mb-12 gap-2">
                     <div className="flex items-center gap-3">
                         <div className={`p-2.5 rounded-2xl shadow-lg ${theme === 'dark' ? 'bg-blue-500 text-white' : 'bg-blue-600 text-white'}`}>
@@ -474,17 +434,11 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                                     {isOnline ? 'Online' : 'Offline'}
                                     {isSyncing && <Loader2 className="w-2 h-2 animate-spin ml-0.5" />}
                                 </div>
-                                {error && (
-                                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-red-500/10 text-red-500 border border-red-500/20">
-                                        Error de conexión
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Quick Theme Switcher */}
                         <div className={`flex items-center p-1 rounded-2xl mr-1 sm:mr-2 ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
                             {[
                                 { id: 'white', icon: <Sun className="w-4 h-4" /> },
@@ -501,10 +455,7 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                             ))}
                         </div>
 
-                        <button
-                            onClick={onOpenSettings}
-                            className={`p-2.5 rounded-2xl transition-all border-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-white border-slate-100 hover:bg-slate-50'} shadow-sm active:scale-95`}
-                        >
+                        <button onClick={onOpenSettings} className={`p-2.5 rounded-2xl transition-all border-2 ${theme === 'dark' ? 'bg-slate-800 border-slate-700 hover:bg-slate-700' : 'bg-white border-slate-100 hover:bg-slate-50'} shadow-sm active:scale-95`}>
                             <Settings className="w-5 h-5 opacity-70" />
                         </button>
 
@@ -516,9 +467,8 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                     </div>
                 </div>
 
-                {/* Sub-header with search */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-                    <div className={`relative flex-1 md:max-w-md group`}>
+                    <div className="relative flex-1 md:max-w-md group">
                         <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 opacity-30 group-focus-within:opacity-100 transition-opacity" />
                         <input
                             type="text"
@@ -539,11 +489,7 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                     <div className="text-center py-32 border-2 border-dashed border-current/10 rounded-3xl">
                         <BookIcon className="w-16 h-16 mx-auto mb-4 opacity-10" />
                         <p className="text-xl font-bold opacity-30 px-4">
-                            {searchTerm
-                                ? 'No se encontraron libros'
-                                : error
-                                    ? `Error de conexión: ${error}`
-                                    : 'Tu biblioteca en la nube está vacía. ¡Sube un EPUB!'}
+                            {searchTerm ? 'No hay resultados' : error ? error : 'Sube un EPUB para empezar'}
                         </p>
                     </div>
                 ) : (

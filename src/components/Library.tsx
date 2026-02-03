@@ -171,7 +171,6 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
     const [searchTerm, setSearchTerm] = useState('')
     const [isOnline, setIsOnline] = useState(navigator.onLine)
     const [isSyncing, setIsSyncing] = useState(true)
-    const [readingStates, setReadingStates] = useState<any[]>([])
     const [error, setError] = useState<string | null>(null)
 
     // Monitor browser online status
@@ -225,7 +224,8 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
 
                 if (!isMounted) return;
 
-                setReadingStates(states);
+                if (!isMounted) return;
+
 
                 const displayBooks: DisplayBook[] = (localBooks || []).map((lb: any) => ({
                     ...lb,
@@ -393,7 +393,6 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                 await markBookAsFinished(bookId)
             }
             const states = await getAllReadingStates()
-            setReadingStates(states)
             setBooks(prev => prev.map(book =>
                 book.id === bookId ? { ...book, isFinished: !currentlyFinished } : book
             ))

@@ -13,9 +13,10 @@ interface ReaderProps {
         lineHeight: number
     }
     onProgress?: (progress: number) => void
+    onChapterInfo?: (info: { label: string, progress: number }) => void
 }
 
-const Reader: React.FC<ReaderProps> = ({ data, location, onLocationChange, onTocLoaded, onProgress, settings }) => {
+const Reader: React.FC<ReaderProps> = ({ data, location, onLocationChange, onTocLoaded, onProgress, onChapterInfo, settings }) => {
     const viewerRef = useRef<HTMLDivElement>(null)
     const [rendition, setRendition] = useState<Rendition | null>(null)
 
@@ -100,6 +101,15 @@ const Reader: React.FC<ReaderProps> = ({ data, location, onLocationChange, onToc
             if (book.locations && book.locations.length() > 0) {
                 const progress = book.locations.percentageFromCfi(currentCfi)
                 if (onProgress) onProgress(progress)
+            }
+
+            // Chapter Info
+            const chapter = book.navigation.get(loc.start.href)
+            if (onChapterInfo) {
+                onChapterInfo({
+                    label: chapter ? chapter.label.trim() : 'Capítulo',
+                    progress: loc.start.percentage
+                })
             }
         })
 

@@ -210,86 +210,84 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
         })
     )
 
-    // Load reading states
+    // 1. Load Local Data Immediately (with ultra-safe fallback)
     useEffect(() => {
-        const loadReadingStates = async () => {
-            try {
-                console.log("Loading reading states...")
-                const states = await getAllReadingStates()
-                console.log("Reading states loaded:", states.length)
-                setReadingStates(states)
-            } catch (e) {
-                console.error('Error loading reading states:', e)
-                setReadingStates([])
-            }
-        }
-        loadReadingStates()
-    }, [])
+        let isMounted = true;
 
-    // Sync books from Firestore (Source of Truth)
-    useEffect(() => {
-        // 1. Initial Local Load (Fastest path)
-        const loadLocalOnly = async () => {
+        // Force-hide loader after 3 seconds no matter what
+        const finalSafetyTimer = setTimeout(() => {
+            if (isMounted && loading) {
+                console.warn("Library: Hard timeout reached, forcing loader hide");
+                setLoading(false);
+            }
+        }, 3000);
+
+        const loadInitialData = async () => {
+            console.log("Library: Starting initial local load...")
             try {
-                const localBooks = await getAllLocalBooks()
-                if (localBooks.length > 0) {
-                    console.log("Loaded local books immediately:", localBooks.length)
-                    const displayBooks: DisplayBook[] = localBooks.map(lb => ({
-                        ...lb,
-                        isDownloaded: true,
-                        isDownloading: false,
-                        isFinished: false // Default, will update when reading states load
-                    }))
-                    setBooks(prev => {
-                        // Only set if we don't have books yet (avoid flickering)
-                        return prev.length === 0 ? displayBooks : prev
-                    })
-                    // If we found local books, we can stop the "full screen" loading
-                    // But we keep the small header spinner to show "Syncing"
+                // Wrap DB calls in timeouts to prevent hanging
+                const withTimeout = (promise: Promise<any>, timeoutMs: number) =>
+                    Promise.race([
+                        promise,
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), timeoutMs))
+                    ]);
+
+                // Load local books
+                const localBooks = await withTimeout(getAllLocalBooks(), 2000).catch(() => []);
+                console.log(`Library: Found ${localBooks?.length || 0} local books`)
+
+                // Load reading states
+                const states = await withTimeout(getAllReadingStates(), 2000).catch(() => []);
+                if (isMounted) setReadingStates(states);
+
+                const displayBooks: DisplayBook[] = (localBooks || []).map((lb: LocalBook) => ({
+                    ...lb,
+                    isDownloaded: true,
+                    isDownloading: false,
+                    isFinished: states.find((rs: any) => rs.bookId === lb.id)?.isFinished || false
+                }))
+
+                if (isMounted) {
+                    setBooks(displayBooks)
                     setLoading(false)
                 }
             } catch (err) {
-                console.error("Error loading local books:", err)
+                console.error("Library: Error loading local data:", err)
+                if (isMounted) setLoading(false)
+            } finally {
+                clearTimeout(finalSafetyTimer);
             }
         }
 
-        loadLocalOnly()
+        loadInitialData()
+        return () => { isMounted = false; clearTimeout(finalSafetyTimer); };
+    }, [])
 
-        // 2. Safety timeout
-        const safetyTimeout = setTimeout(() => {
-            if (loading) {
-                console.log("Firestore sync timeout - Forcing UI load with what we have");
-                setLoading(false);
-            }
-        }, 5000);
+    // 2. Background Cloud Sync
+    useEffect(() => {
+        if (loading) return // Wait for initial local load
 
-        // 3. Cloud Sync
-        const q = query(collection(db, 'books'))
+        console.log("Library: Starting background cloud sync...")
         setIsSyncing(true)
 
-        console.log("Setting up Firestore listener...")
-
+        const q = query(collection(db, 'books'))
         const unsubscribe = onSnapshot(q, { includeMetadataChanges: true }, async (snapshot) => {
             try {
-                // Clear timeout since we got a response
-                clearTimeout(safetyTimeout)
-
                 const isFromCache = snapshot.metadata.fromCache
-                const hasPendingWrites = snapshot.metadata.hasPendingWrites
-
-                console.log(`Firestore Sync: Received ${snapshot.docs.length} books. Source: ${isFromCache ? 'CACHE' : 'SERVER'}. Pending writes: ${hasPendingWrites}`)
+                console.log(`Library: Cloud Sync update received. Docs: ${snapshot.docs.length} (Cache: ${isFromCache})`)
 
                 const cloudBooks = snapshot.docs.map(doc => ({
                     id: doc.id,
                     ...doc.data()
                 })) as DisplayBook[]
 
-                // Always re-fetch local books to ensure synchronization
+                // Re-fetch local data to merge correctly
                 const localBooks = await getAllLocalBooks()
+                const states = await getAllReadingStates()
 
                 const mergedBooks = cloudBooks.map(cb => {
                     const local = localBooks.find(lb => lb.id === cb.id)
-                    const readingState = readingStates.find(rs => rs.bookId === cb.id)
+                    const readingState = states.find(rs => rs.bookId === cb.id)
                     return {
                         ...cb,
                         isDownloaded: !!local,
@@ -298,28 +296,28 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                     }
                 })
 
-                console.log("Merged books:", mergedBooks.length)
                 setBooks(mergedBooks.sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || (b.createdAt ?? 0) - (a.createdAt ?? 0)))
+                setError(null)
             } catch (e: any) {
-                console.error("Error processing Firestore data:", e)
-                setError(e.message)
+                console.error("Library: Cloud Sync processing error:", e)
             } finally {
-                setLoading(false)
                 setIsSyncing(false)
             }
         }, (err) => {
-            console.error("Firestore sync error:", err)
-            setError(err.message)
-            setLoading(false)
+            console.error("Library: Cloud Sync connection error:", err)
+            // We don't block the UI for sync errors
             setIsSyncing(false)
+            // Only show error if we have no books at all (maybe completely offline/no cache)
+            if (books.length === 0) {
+                setError("No se pudo conectar con la nube.")
+            }
         })
 
         return () => {
-            console.log("Unsubscribing from Firestore...")
+            console.log("Library: Stopping cloud sync listener")
             unsubscribe()
-            clearTimeout(safetyTimeout)
         }
-    }, [readingStates])
+    }, [loading]) // Start sync after local load is done
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -535,7 +533,7 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
                 {loading ? (
                     <div className="flex flex-col items-center justify-center py-32 opacity-20">
                         <Loader2 className="w-12 h-12 animate-spin mb-4" />
-                        <p className="font-bold text-center">Sincronizando con la nube...</p>
+                        <p className="font-bold text-center">Iniciando biblioteca...</p>
                     </div>
                 ) : filteredBooks.length === 0 ? (
                     <div className="text-center py-32 border-2 border-dashed border-current/10 rounded-3xl">

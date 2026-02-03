@@ -30,6 +30,7 @@ function App() {
     const [toc, setToc] = useState<any[]>([])
     const [location, setLocation] = useState<string | null>(null)
     const [progress, setProgress] = useState(0)
+    const [chapterInfo, setChapterInfo] = useState<{ label: string, progress: number } | null>(null)
     const [isSidebarOpen, setIsSidebarOpen] = useState(false)
     const [isSettingsOpen, setIsSettingsOpen] = useState(false)
     const [isFullscreen, setIsFullscreen] = useState(false)
@@ -315,7 +316,7 @@ function App() {
                 {/* Navigation Layers */}
                 <div className="absolute inset-0 flex">
                     <div
-                        className="w-16 sm:w-24 h-full flex items-center justify-center cursor-pointer group z-20"
+                        className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20"
                         onClick={() => (window as any).epubRendition?.prev()}
                     >
                         <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
@@ -327,7 +328,7 @@ function App() {
                         onClick={handleShowControls}
                     />
                     <div
-                        className="w-16 sm:w-24 h-full flex items-center justify-center cursor-pointer group z-20"
+                        className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20"
                         onClick={() => (window as any).epubRendition?.next()}
                     >
                         <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
@@ -344,6 +345,7 @@ function App() {
                             onLocationChange={handleLocationChange}
                             onTocLoaded={(tocData) => setToc(tocData)}
                             onProgress={(p) => setProgress(p)}
+                            onChapterInfo={setChapterInfo}
                             settings={settings}
                         />
                     )}
@@ -351,25 +353,54 @@ function App() {
             </main>
 
             {/* Footer / Progress Bar */}
-            <footer className={`transition-all duration-300 z-30 flex flex-col justify-center px-4 sm:px-8 ${isFullscreen
-                ? 'fixed bottom-0 left-0 right-0 h-4 bg-transparent border-none opacity-50 hover:opacity-100'
-                : `h-14 border-t ${headerFooterClasses}`
+            <footer className={`transition-all duration-300 z-30 flex flex-col justify-center px-4 sm:px-8 relative ${isFullscreen
+                ? 'fixed bottom-0 left-0 right-0 h-1.5 bg-transparent border-none opacity-40 hover:opacity-100 py-4'
+                : `py-4 border-t ${headerFooterClasses}`
                 }`}>
-                {!isFullscreen && (
-                    <div className="flex justify-between items-center mb-2">
-                        <span className="text-[10px] font-bold opacity-40 uppercase tracking-widest leading-none">Progreso de lectura</span>
-                        <span className="text-[10px] font-bold text-blue-500 leading-none">{(progress * 100).toFixed(1)}%</span>
+
+                {/* Chapter Info Floating Badge (Mobile & Desktop) */}
+                {!isFullscreen && chapterInfo && (
+                    <div className="flex flex-col gap-1 mb-3">
+                        <div className="flex justify-between items-end">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40 mb-0.5">Capítulo Actual</span>
+                                <h3 className="text-[11px] font-bold truncate max-w-[200px] sm:max-w-md leading-tight">
+                                    {chapterInfo.label}
+                                </h3>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[10px] font-bold opacity-60">
+                                    {Math.round(chapterInfo.progress * 100)}% del capítulo
+                                </span>
+                            </div>
+                        </div>
+                        {/* Chapter mini-progress bar */}
+                        <div className="h-1 w-full bg-black/5 dark:bg-white/5 rounded-full overflow-hidden">
+                            <div
+                                className="h-full bg-blue-500/40 transition-all duration-500 rounded-full"
+                                style={{ width: `${chapterInfo.progress * 100}%` }}
+                            />
+                        </div>
                     </div>
                 )}
+
+                {/* Main Progress Bar */}
+                {!isFullscreen && (
+                    <div className="flex justify-between items-center mb-1.5 mt-1">
+                        <span className="text-[9px] font-black opacity-30 uppercase tracking-[0.2em]">Progreso Total</span>
+                        <span className="text-[10px] font-black text-blue-500 tracking-wider">{(progress * 100).toFixed(1)}%</span>
+                    </div>
+                )}
+
                 <div
-                    className={`progress-bar-container relative w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden cursor-pointer ${isFullscreen ? 'h-1' : 'h-2'}`}
+                    className={`group relative w-full bg-black/10 dark:bg-white/10 rounded-full overflow-hidden cursor-pointer transition-all ${isFullscreen ? 'h-1.5 hover:h-2' : 'h-2 hover:h-2.5'}`}
                     onClick={handleProgressClick}
                 >
                     <div
-                        className="h-full bg-blue-500 transition-all duration-300 relative"
+                        className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-300 relative rounded-full"
                         style={{ width: `${progress * 100}%` }}
                     >
-                        <div className={`progress-bar-handle ${isFullscreen ? 'scale-75' : ''}`} style={{ left: `${progress * 100}%` }} />
+                        <div className="absolute inset-0 bg-white/20 animate-pulse-slow" />
                     </div>
                 </div>
             </footer>

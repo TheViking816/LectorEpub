@@ -314,27 +314,37 @@ function App() {
             {/* Main Content */}
             <main className="flex-1 relative overflow-hidden flex items-center justify-center">
                 {/* Navigation Layers */}
-                <div className="absolute inset-0 flex">
-                    <div
-                        className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20"
-                        onClick={() => (window as any).epubRendition?.prev()}
-                    >
-                        <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
-                            <ChevronLeft className="w-8 h-8" />
-                        </div>
-                    </div>
-                    <div
-                        className="flex-1 h-full cursor-pointer"
-                        onClick={handleShowControls}
-                    />
-                    <div
-                        className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20"
-                        onClick={() => (window as any).epubRendition?.next()}
-                    >
-                        <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
-                            <ChevronRight className="w-8 h-8" />
-                        </div>
-                    </div>
+                <div className="absolute inset-0 flex pointer-events-none">
+                    {!isFullscreen && (
+                        <>
+                            <div
+                                className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
+                                onClick={() => (window as any).epubRendition?.prev()}
+                            >
+                                <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
+                                    <ChevronLeft className="w-8 h-8" />
+                                </div>
+                            </div>
+                            <div
+                                className="flex-1 h-full cursor-pointer pointer-events-auto"
+                                onClick={handleShowControls}
+                            />
+                            <div
+                                className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
+                                onClick={() => (window as any).epubRendition?.next()}
+                            >
+                                <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
+                                    <ChevronRight className="w-8 h-8" />
+                                </div>
+                            </div>
+                        </>
+                    )}
+                    {isFullscreen && (
+                        <div
+                            className="flex-1 h-full cursor-pointer pointer-events-auto"
+                            onClick={handleShowControls}
+                        />
+                    )}
                 </div>
 
                 <div className={`w-full h-full max-w-5xl mx-auto overflow-hidden transition-all duration-300 ${isFullscreen ? 'px-4 py-2' : 'px-4 sm:px-16 py-6'}`}>
@@ -350,15 +360,28 @@ function App() {
                         />
                     )}
                 </div>
+
+                {/* Fullscreen Chapter Info Overlay */}
+                {isFullscreen && chapterInfo && showFullscreenControls && (
+                    <div className="absolute bottom-12 left-0 right-0 flex justify-center z-40 pointer-events-none">
+                        <div className="bg-black/70 backdrop-blur-md text-white px-4 py-2 rounded-full shadow-lg flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2">
+                            <span className="text-[10px] font-bold uppercase opacity-70 truncate max-w-[150px]">{chapterInfo.label}</span>
+                            <div className="w-24 h-1 bg-white/20 rounded-full overflow-hidden">
+                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${chapterInfo.progress * 100}%` }} />
+                            </div>
+                            <span className="text-[10px] font-bold">{Math.round(chapterInfo.progress * 100)}%</span>
+                        </div>
+                    </div>
+                )}
             </main>
 
             {/* Footer / Progress Bar */}
             <footer className={`transition-all duration-300 z-30 flex flex-col justify-center px-4 sm:px-8 relative ${isFullscreen
-                ? 'fixed bottom-0 left-0 right-0 h-1.5 bg-transparent border-none opacity-40 hover:opacity-100 py-4'
+                ? 'fixed bottom-0 left-0 right-0 h-1.5 bg-transparent border-none opacity-0 hover:opacity-100 py-4'
                 : `py-4 border-t ${headerFooterClasses}`
                 }`}>
 
-                {/* Chapter Info Floating Badge (Mobile & Desktop) */}
+                {/* Chapter Info Floating Badge (Desktop Normal Mode) */}
                 {!isFullscreen && chapterInfo && (
                     <div className="flex flex-col gap-1 mb-3">
                         <div className="flex justify-between items-end">

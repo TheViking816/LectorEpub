@@ -105,10 +105,47 @@ const Reader: React.FC<ReaderProps> = ({ data, location, onLocationChange, onToc
 
             // Chapter Info
             const chapter = book.navigation.get(loc.start.href)
+
+            let chapterProgress = 0;
+            if (book.locations.length() > 0) {
+                const currentCfi = loc.start.cfi;
+                const locations = (book.locations as any)._locations;
+                const currentSpineIndex = loc.start.index;
+                const currentLocationIndex = book.locations.locationFromCfi(currentCfi);
+
+                // Helper to safely get spine index
+                const getSpinePos = (cfi: string) => {
+                    try {
+                        return new (ePub as any).CFI(cfi).spinePos
+                    } catch {
+                        return -1
+                    }
+                }
+
+                // Find start of this chapter
+                let start = currentLocationIndex;
+                while (start > 0 && getSpinePos(locations[start - 1]) === currentSpineIndex) {
+                    start--;
+                }
+
+                // Find end of this chapter
+                let end = currentLocationIndex;
+                while (end < locations.length - 1 && getSpinePos(locations[end + 1]) === currentSpineIndex) {
+                    end++;
+                }
+
+                const total = end - start + 1;
+                const current = currentLocationIndex - start + 1;
+                chapterProgress = current / total;
+            } else {
+                // Fallback if locations aren't ready
+                chapterProgress = loc.start.percentage;
+            }
+
             if (onChapterInfo) {
                 onChapterInfo({
                     label: chapter ? chapter.label.trim() : 'Capítulo',
-                    progress: loc.start.percentage
+                    progress: chapterProgress
                 })
             }
         })

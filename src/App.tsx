@@ -315,36 +315,35 @@ function App() {
             <main className="flex-1 relative overflow-hidden flex items-center justify-center">
                 {/* Navigation Layers */}
                 <div className="absolute inset-0 flex pointer-events-none">
-                    {!isFullscreen && (
-                        <>
-                            <div
-                                className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
-                                onClick={() => (window as any).epubRendition?.prev()}
-                            >
-                                <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
-                                    <ChevronLeft className="w-8 h-8" />
-                                </div>
+                    {/* Left Click Zone (Prev) */}
+                    <div
+                        className="w-16 sm:w-24 h-full flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
+                        onClick={() => (window as any).epubRendition?.prev()}
+                    >
+                        {!isFullscreen && (
+                            <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current hidden sm:block">
+                                <ChevronLeft className="w-8 h-8" />
                             </div>
-                            <div
-                                className="flex-1 h-full cursor-pointer pointer-events-auto"
-                                onClick={handleShowControls}
-                            />
-                            <div
-                                className="w-16 sm:w-24 h-full hidden sm:flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
-                                onClick={() => (window as any).epubRendition?.next()}
-                            >
-                                <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current">
-                                    <ChevronRight className="w-8 h-8" />
-                                </div>
+                        )}
+                    </div>
+
+                    {/* Center Zone (Controls) */}
+                    <div
+                        className="flex-1 h-full cursor-pointer pointer-events-auto"
+                        onClick={handleShowControls}
+                    />
+
+                    {/* Right Click Zone (Next) */}
+                    <div
+                        className="w-16 sm:w-24 h-full flex items-center justify-center cursor-pointer group z-20 pointer-events-auto"
+                        onClick={() => (window as any).epubRendition?.next()}
+                    >
+                        {!isFullscreen && (
+                            <div className="p-4 rounded-full bg-black/0 group-hover:bg-black/5 dark:group-hover:bg-white/5 transition-all text-transparent group-hover:text-current hidden sm:block">
+                                <ChevronRight className="w-8 h-8" />
                             </div>
-                        </>
-                    )}
-                    {isFullscreen && (
-                        <div
-                            className="flex-1 h-full cursor-pointer pointer-events-auto"
-                            onClick={handleShowControls}
-                        />
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 <div className={`w-full h-full max-w-5xl mx-auto overflow-hidden transition-all duration-300 ${isFullscreen ? 'px-4 py-2' : 'px-4 sm:px-16 py-6'}`}>

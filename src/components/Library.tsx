@@ -392,7 +392,6 @@ const Library: React.FC<LibraryProps> = ({ onSelectBook, theme, onOpenSettings, 
             } else {
                 await markBookAsFinished(bookId)
             }
-            const states = await getAllReadingStates()
             setBooks(prev => prev.map(book =>
                 book.id === bookId ? { ...book, isFinished: !currentlyFinished } : book
             ))
